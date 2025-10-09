@@ -75,7 +75,12 @@ The system provides transparent reasoning traces that include:
 pip install -r requirements.txt
 ```
 
-3. Use the system:
+3. run the system:
+```bash
+python main.py
+```
+
+5. Use the system:
 ```python
 from main import AgentSystem
 
@@ -92,11 +97,6 @@ print(solution)
 
 # Process a dataset
 agent.process_dataset("test.csv", "output.csv")
-```
-
-4. Run tests:
-```bash
-python -m pytest tests/
 ```
 
 ## Project Structure
