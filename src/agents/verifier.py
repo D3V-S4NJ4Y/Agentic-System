@@ -147,3 +147,55 @@ class Verifier(BaseAgent):
         weighted_conf = np.average(confidences, weights=weights)
         
         return float(weighted_conf)
+    
+    def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Process solutions and verify them"""
+        solution = input_data.get("solution", {})
+        problem = input_data.get("problem", {})
+        constraints = input_data.get("constraints", [])
+        
+        # Basic verification
+        constraints_satisfied = self._check_constraints(solution, constraints)
+        logic_valid = self._check_logic_validity(solution)
+        completeness = self._check_completeness(solution, problem)
+        
+        overall_confidence = (constraints_satisfied + logic_valid + completeness) / 3.0
+        
+        return {
+            "constraints_satisfied": constraints_satisfied,
+            "logic_valid": logic_valid,
+            "completeness": completeness,
+            "overall_confidence": overall_confidence
+        }
+    
+    def _check_constraints(self, solution: Dict[str, Any], constraints: List[str]) -> float:
+        """Check if solution satisfies constraints"""
+        if not constraints:
+            return 1.0
+        
+        solution_text = str(solution.get("final_solution", "")).lower()
+        satisfied = 0
+        
+        for constraint in constraints:
+            # Simple keyword matching for constraint satisfaction
+            constraint_words = constraint.lower().split()
+            if any(word in solution_text for word in constraint_words):
+                satisfied += 1
+                
+        return satisfied / len(constraints) if constraints else 1.0
+    
+    def _check_logic_validity(self, solution: Dict[str, Any]) -> float:
+        """Check logical validity of solution"""
+        # Basic check - solution exists and is not empty
+        if solution.get("final_solution"):
+            return 0.8
+        return 0.0
+    
+    def _check_completeness(self, solution: Dict[str, Any], problem: Dict[str, Any]) -> float:
+        """Check if solution is complete"""
+        # Check if solution addresses the problem
+        if solution.get("final_solution") and solution.get("explanation"):
+            return 0.9
+        elif solution.get("final_solution"):
+            return 0.6
+        return 0.0

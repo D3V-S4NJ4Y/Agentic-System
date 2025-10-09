@@ -1,129 +1,135 @@
-from abc import ABC, abstractmethod
-from typing import Dict, Any, List
-import re
 import logging
-import json
-from concurrent.futures import ThreadPoolExecutor
-from functools import lru_cache
+from typing import Dict, Any, List, Optional, Tuple
+from abc import ABC, abstractmethod
+import re
+from dataclasses import dataclass
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+@dataclass
+class ProblemContext:
+    """Stores problem context and intermediate results"""
+    problem_text: str
+    problem_type: Optional[str] = None
+    subtasks: List[str] = None
+    tools_used: List[str] = None
+    intermediate_results: Dict[str, Any] = None
+    confidence: float = 0.0
+    
+    def __post_init__(self):
+        if self.subtasks is None:
+            self.subtasks = []
+        if self.tools_used is None:
+            self.tools_used = []
+        if self.intermediate_results is None:
+            self.intermediate_results = {}
 
 class BaseAgent(ABC):
-    """Base class for all agents in the system"""
+    """Enhanced base agent with improved reasoning capabilities"""
     
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
-        self._cache = {}
-    
+        
+        # Problem type detection patterns
+        self.type_patterns = {
+            'sequence': r'(?:next|pattern|series|sequence|following)',
+            'spatial': r'(?:position|distance|arrangement|shape|cube|rotate)',
+            'mechanism': r'(?:machine|gear|pulley|lever|wheel|mechanism)',
+            'optimization': r'(?:maximum|minimum|optimize|best|efficient)',
+            'probability': r'(?:chance|probability|likely|odds)',
+            'temporal': r'(?:time|schedule|duration|before|after)',
+            'logical': r'(?:if|then|either|or|all|none|some)'
+        }
+        
     @abstractmethod
     def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Process the input data and return results
-        
-        Args:
-            input_data (Dict[str, Any]): Input data to process
-            
-        Returns:
-            Dict[str, Any]: Processed results
-        """
+        """Process input data and return results"""
         pass
+        
+    def _log_step(self, message: str, data: Dict[str, Any] = None):
+        """Log a processing step"""
+        if data:
+            self.logger.info(f"{message}: {data}")
+        else:
+            self.logger.info(message)
+            
+    def classify_problem(self, text: str) -> List[str]:
+        """Identify the type(s) of problem based on text analysis"""
+        text = text.lower()
+        problem_types = []
+        
+        # Log the analysis start
+        self._log_step("Starting problem classification")
+        
+        # Check each pattern
+        for p_type, pattern in self.type_patterns.items():
+            if re.search(pattern, text):
+                problem_types.append(p_type)
+                self._log_step(f"Detected problem type: {p_type}")
+                
+        return problem_types
     
-    def _log_step(self, message: str):
-        """Log a step in the agent's process"""
-        self.logger.info(f"[{self.__class__.__name__}] {message}")
+    def extract_numerical_values(self, text: str) -> List[float]:
+        """Extract all numerical values from the text"""
+        # Match both integers and decimals
+        numbers = re.findall(r'-?\d*\.?\d+', text)
+        values = [float(n) for n in numbers]
+        self._log_step(f"Extracted numerical values", {"values": values})
+        return values
     
-    @lru_cache(maxsize=1000)
-    def _get_cached_result(self, problem_hash: str) -> Dict[str, Any]:
-        """Get cached result for a problem"""
-        return self._cache.get(problem_hash)
-    
-    def _cache_result(self, problem_hash: str, result: Dict[str, Any]):
-        """Cache a result for future use"""
-        self._cache[problem_hash] = result
-    
-    def _generate_problem_hash(self, problem: Dict[str, Any]) -> str:
-        """Generate a unique hash for a problem"""
-        return json.dumps(problem, sort_keys=True)
-    
-    def _extract_numbers(self, text: str) -> List[float]:
-        """Extract numbers from text"""
-        return [float(n) for n in re.findall(r'-?\d*\.?\d+', text)]
-    
-    def _extract_keywords(self, text: str) -> List[str]:
-        """Extract important keywords from text"""
-        keywords = []
-        indicators = {
-            'math': r'calculate|compute|solve|equation|value',
-            'logic': r'deduce|infer|reason|conclude',
-            'sequence': r'pattern|series|next|follow',
-            'probability': r'chance|likely|probability|odds',
-            'optimization': r'maximize|minimize|optimal|best'
+    def extract_units(self, text: str) -> Dict[str, List[str]]:
+        """Extract measurement units from the text"""
+        unit_patterns = {
+            'length': r'(?:meter|m|km|cm|inch|ft|feet)',
+            'time': r'(?:second|minute|hour|day|s|min|hr)',
+            'weight': r'(?:gram|kg|pound|lb|g)',
+            'speed': r'(?:m/s|mph|km/h)',
+            'temperature': r'(?:celsius|fahrenheit|°C|°F)',
+            'angle': r'(?:degree|radian|°)'
         }
         
-        for category, pattern in indicators.items():
-            if re.search(pattern, text, re.IGNORECASE):
-                keywords.append(category)
-        
-        return keywords
+        units = {}
+        for u_type, pattern in unit_patterns.items():
+            matches = re.findall(pattern, text.lower())
+            if matches:
+                units[u_type] = matches
+                self._log_step(f"Found {u_type} units", {"units": matches})
+                
+        return units
     
-    def _identify_constraints(self, text: str) -> List[str]:
-        """Identify constraints in the problem"""
-        constraints = []
-        constraint_patterns = [
-            r'must\s+\w+',
-            r'cannot\s+\w+',
-            r'only\s+\w+',
-            r'at\s+least\s+\w+',
-            r'at\s+most\s+\w+',
-            r'exactly\s+\w+'
-        ]
+    def verify_solution(self, solution: Dict[str, Any], context: ProblemContext) -> bool:
+        """Enhanced verification method"""
+        self._log_step("Starting solution verification")
         
-        for pattern in constraint_patterns:
-            matches = re.finditer(pattern, text, re.IGNORECASE)
-            constraints.extend(match.group() for match in matches)
-        
-        return constraints
+        # Basic checks
+        if solution.get("solution") is None:
+            self._log_step("Verification failed: No solution provided")
+            return False
+            
+        # Check numerical consistency
+        if isinstance(solution["solution"], (int, float)):
+            numbers = self.extract_numerical_values(context.problem_text)
+            if numbers and (min(numbers) > solution["solution"] or solution["solution"] > max(numbers) * 100):
+                self._log_step("Verification failed: Solution outside reasonable range")
+                return False
+                
+        # Check step consistency
+        steps = solution.get("steps", [])
+        if not steps or len(steps) < 2:  # Need at least problem identification and solution
+            self._log_step("Verification failed: Insufficient solution steps")
+            return False
+            
+        self._log_step("Solution verification passed")
+        return True
     
-    def _extract_logical_relations(self, text: str) -> List[Dict[str, str]]:
-        """Extract logical relations from text"""
-        relations = []
-        patterns = {
-            'if_then': r'if\s+(.+?)\s+then\s+(.+?)(?:\.|$)',
-            'because': r'(.+?)\s+because\s+(.+?)(?:\.|$)',
-            'therefore': r'(.+?)\s+therefore\s+(.+?)(?:\.|$)'
+    def create_solution_template(self) -> Dict[str, Any]:
+        """Create a standard solution template"""
+        return {
+            "solution": None,
+            "steps": [],
+            "confidence": 0.0,
+            "intermediate_results": {},
+            "tools_used": [],
+            "verification": {
+                "passed": False,
+                "checks": []
+            }
         }
-        
-        for rel_type, pattern in patterns.items():
-            matches = re.finditer(pattern, text, re.IGNORECASE)
-            for match in matches:
-                relations.append({
-                    'type': rel_type,
-                    'antecedent': match.group(1).strip(),
-                    'consequent': match.group(2).strip()
-                })
-        
-        return relations
-    
-    def _verify_logical_consistency(self, statements: List[Dict[str, str]]) -> bool:
-        """Verify logical consistency of extracted statements"""
-        seen_statements = set()
-        contradictions = False
-        
-        for statement in statements:
-            key = f"{statement['antecedent']}_{statement['consequent']}"
-            if key in seen_statements:
-                continue
-                
-            neg_key = f"{statement['consequent']}_{statement['antecedent']}"
-            if neg_key in seen_statements:
-                contradictions = True
-                break
-                
-            seen_statements.add(key)
-        
-        return not contradictions
-        msg = f"[{self.__class__.__name__}] {step}"
-        if details:
-            msg += f": {details}"
-        self.logger.info(msg)

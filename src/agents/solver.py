@@ -1,6 +1,5 @@
 from typing import Dict, List, Any, Optional
 import re
-from sympy import solve, sympify, Symbol
 from .base_agent import BaseAgent
 from ..tools.symbolic_solver import SymbolicSolver
 from ..tools.calculator import Calculator
@@ -80,7 +79,7 @@ class Solver(BaseAgent):
             }
         }
     
-    def _select_tool(self, step: str) -> str:
+    def _select_tool(self, step: str, context: Dict[str, Any]) -> str:
         """Select the appropriate tool for solving a step"""
         step = step.lower()
         
@@ -97,6 +96,31 @@ class Solver(BaseAgent):
             return "calculator"
             
         return "logic"  # Default to logical reasoning
+    
+    def _enrich_with_context(self, step: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Enrich step with context from previous solutions"""
+        return {
+            "problem_statement": step,
+            "context": context
+        }
+    
+    def _verify_solution(self, solution: Dict[str, Any], step: str) -> Dict[str, Any]:
+        """Verify a solution for a step"""
+        if solution.get("solution") is not None:
+            return {"valid": True, "confidence": 0.8}
+        else:
+            return {"valid": False, "confidence": 0.0}
+    
+    def _extract_context(self, solution: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract context information from solution"""
+        context = {}
+        if "solution" in solution and solution["solution"] is not None:
+            context["last_result"] = solution["solution"]
+        return context
+    
+    def _calculate_confidence(self, verification: Dict[str, Any]) -> float:
+        """Calculate confidence score from verification"""
+        return verification.get("confidence", 0.0)
     
     def _calculate_success_rate(self, solutions: List[Dict[str, Any]]) -> float:
         """Calculate the success rate of solutions"""

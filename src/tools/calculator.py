@@ -1,75 +1,89 @@
-from typing import Any
+from typing import Dict, Any, List
 import re
-from .symbolic_solver import BaseSolver
+import math
 
-class Calculator(BaseSolver):
-    """Handles basic numerical calculations"""
+class Calculator:
+    """Basic calculator for numerical computations"""
     
-    def solve(self, problem: str) -> Any:
-        numbers = self._extract_numbers(problem)
-        operation = self._determine_operation(problem)
-        
-        if not numbers:
-            raise ValueError("No numbers found in the problem")
-            
-        if not operation:
-            return numbers[0] if len(numbers) == 1 else numbers
-            
-        return self._calculate(numbers, operation)
-    
-    def _extract_numbers(self, text: str) -> list:
-        """Extract all numbers from text"""
-        return [float(n) for n in re.findall(r'-?\d*\.?\d+', text)]
-    
-    def _determine_operation(self, text: str) -> str:
-        """Determine the mathematical operation to perform"""
-        text = text.lower()
-        
-        # Map keywords to operations
-        operations = {
-            "add": "+",
-            "plus": "+",
-            "sum": "+",
-            "total": "+",
-            "subtract": "-",
-            "minus": "-",
-            "difference": "-",
-            "multiply": "*",
-            "times": "*",
-            "product": "*",
-            "divide": "/",
-            "quotient": "/"
+    def __init__(self):
+        self.operations = {
+            '+': lambda x, y: x + y,
+            '-': lambda x, y: x - y,
+            '*': lambda x, y: x * y,
+            '/': lambda x, y: x / y if y != 0 else float('inf'),
+            '**': lambda x, y: x ** y,
+            '^': lambda x, y: x ** y
         }
-        
-        # Check for operation keywords
-        for keyword, op in operations.items():
-            if keyword in text:
-                return op
-                
-        # Check for mathematical symbols
-        symbols = ["+", "-", "*", "/"]
-        for symbol in symbols:
-            if symbol in text:
-                return symbol
-                
-        return ""
     
-    def _calculate(self, numbers: list, operation: str) -> float:
-        """Perform the calculation"""
-        if len(numbers) < 2:
-            return numbers[0]
+    def solve(self, problem: Dict[str, Any]) -> Dict[str, Any]:
+        """Perform numerical calculations"""
+        try:
+            problem_text = problem.get("problem_statement", "")
+            
+            # Extract numbers
+            numbers = self._extract_numbers(problem_text)
+            
+            # Extract operations
+            operations = self._extract_operations(problem_text)
+            
+            if len(numbers) >= 2 and operations:
+                result = self._calculate(numbers, operations)
+                return {
+                    "solution": result,
+                    "method": "numerical_calculation",
+                    "numbers": numbers,
+                    "operations": operations
+                }
+            elif len(numbers) == 1:
+                # Single number operations (sqrt, factorial, etc.)
+                result = self._single_number_operations(numbers[0], problem_text)
+                return {
+                    "solution": result,
+                    "method": "single_number_operation",
+                    "number": numbers[0]
+                }
+                
+            return {"solution": None, "error": "Insufficient numerical data"}
+            
+        except Exception as e:
+            return {"solution": None, "error": str(e)}
+    
+    def _extract_numbers(self, text: str) -> List[float]:
+        """Extract numbers from text"""
+        numbers = re.findall(r'-?\d+\.?\d*', text)
+        return [float(num) for num in numbers]
+    
+    def _extract_operations(self, text: str) -> List[str]:
+        """Extract mathematical operations from text"""
+        ops = []
+        for op in self.operations.keys():
+            if op in text:
+                ops.append(op)
+        return ops
+    
+    def _calculate(self, numbers: List[float], operations: List[str]) -> float:
+        """Perform calculation with numbers and operations"""
+        if not numbers or not operations:
+            return 0
             
         result = numbers[0]
-        for num in numbers[1:]:
-            if operation == "+":
-                result += num
-            elif operation == "-":
-                result -= num
-            elif operation == "*":
-                result *= num
-            elif operation == "/" and num != 0:
-                result /= num
-            else:
-                raise ValueError(f"Invalid operation: {operation}")
+        for i, op in enumerate(operations):
+            if i + 1 < len(numbers) and op in self.operations:
+                result = self.operations[op](result, numbers[i + 1])
                 
         return result
+    
+    def _single_number_operations(self, number: float, text: str) -> float:
+        """Perform single number operations"""
+        text = text.lower()
+        
+        if 'sqrt' in text or 'square root' in text:
+            return math.sqrt(abs(number))
+        elif 'factorial' in text:
+            return math.factorial(int(abs(number))) if number >= 0 and number == int(number) else 0
+        elif 'square' in text:
+            return number ** 2
+        elif 'cube' in text:
+            return number ** 3
+        else:
+            return number

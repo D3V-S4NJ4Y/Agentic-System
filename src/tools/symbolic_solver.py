@@ -1,58 +1,79 @@
-from typing import Any
-import sympy
+from typing import Dict, Any, List
+import sympy as sp
 import re
-from abc import ABC, abstractmethod
 
-class BaseSolver(ABC):
-    @abstractmethod
-    def solve(self, problem: str) -> Any:
-        pass
-
-class SymbolicSolver(BaseSolver):
-    """Handles mathematical expressions using symbolic computation"""
+class SymbolicSolver:
+    """Symbolic mathematics solver using SymPy"""
     
-    def solve(self, problem: str) -> Any:
-        # Extract mathematical expression
-        expr = self._extract_expression(problem)
-        if not expr:
-            raise ValueError("No mathematical expression found")
+    def __init__(self):
+        self.symbols = {}
         
+    def solve(self, problem: Dict[str, Any]) -> Dict[str, Any]:
+        """Solve mathematical problems symbolically"""
         try:
-            # Convert to SymPy expression
-            sympy_expr = sympy.sympify(expr)
+            problem_text = problem.get("problem_statement", "")
             
-            # Try to solve if it's an equation
-            if "=" in expr:
-                lhs, rhs = expr.split("=")
-                equation = sympy.Eq(sympy.sympify(lhs), sympy.sympify(rhs))
-                return sympy.solve(equation)
+            # Extract equations and expressions
+            equations = self._extract_equations(problem_text)
+            variables = self._extract_variables(problem_text)
             
-            # Otherwise evaluate the expression
-            return float(sympy_expr.evalf())
+            if equations:
+                # Solve system of equations
+                solutions = sp.solve(equations, variables)
+                return {
+                    "solution": solutions,
+                    "method": "symbolic_equation_solving",
+                    "equations": str(equations),
+                    "variables": str(variables)
+                }
+            else:
+                # Try to evaluate expressions
+                expressions = self._extract_expressions(problem_text)
+                if expressions:
+                    results = [sp.simplify(expr) for expr in expressions]
+                    return {
+                        "solution": results,
+                        "method": "symbolic_evaluation",
+                        "expressions": str(expressions)
+                    }
+                    
+            return {"solution": None, "error": "No mathematical expressions found"}
+            
         except Exception as e:
-            raise ValueError(f"Failed to solve expression: {str(e)}")
+            return {"solution": None, "error": str(e)}
     
-    def _extract_expression(self, text: str) -> str:
-        """Extract mathematical expression from text"""
-        # Remove word problems but keep numbers and operators
-        text = text.lower()
+    def _extract_equations(self, text: str) -> List[sp.Eq]:
+        """Extract equations from text"""
+        equations = []
+        # Look for patterns like "x + 2 = 5"
+        eq_patterns = re.findall(r'([^=]+)=([^=]+)', text)
         
-        # Look for explicit equations
-        equation_match = re.search(r'\d+\s*[+\-*/=]+\s*\d+', text)
-        if equation_match:
-            return equation_match.group(0)
-        
-        # Look for numbers and operations
-        numbers = re.findall(r'\d+', text)
-        if len(numbers) >= 2:
-            # Infer operation from keywords
-            if any(op in text for op in ["add", "sum", "plus"]):
-                return f"{numbers[0]} + {numbers[1]}"
-            elif any(op in text for op in ["subtract", "minus", "difference"]):
-                return f"{numbers[0]} - {numbers[1]}"
-            elif any(op in text for op in ["multiply", "times", "product"]):
-                return f"{numbers[0]} * {numbers[1]}"
-            elif any(op in text for op in ["divide", "quotient"]):
-                return f"{numbers[0]} / {numbers[1]}"
+        for left, right in eq_patterns:
+            try:
+                left_expr = sp.sympify(left.strip())
+                right_expr = sp.sympify(right.strip())
+                equations.append(sp.Eq(left_expr, right_expr))
+            except:
+                continue
                 
-        raise ValueError("No mathematical expression found")
+        return equations
+    
+    def _extract_variables(self, text: str) -> List[sp.Symbol]:
+        """Extract variables from text"""
+        # Common variable names
+        var_names = re.findall(r'\b[a-zA-Z]\b', text)
+        return [sp.Symbol(name) for name in set(var_names)]
+    
+    def _extract_expressions(self, text: str) -> List[sp.Basic]:
+        """Extract mathematical expressions from text"""
+        expressions = []
+        # Look for mathematical expressions
+        expr_patterns = re.findall(r'[\d\+\-\*/\^\(\)x-z]+', text)
+        
+        for expr in expr_patterns:
+            try:
+                expressions.append(sp.sympify(expr))
+            except:
+                continue
+                
+        return expressions
