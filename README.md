@@ -146,4 +146,4 @@ Future work could include:
 
 ## Conclusion
 
-The Agentic Reasoning System demonstrates the power of combining modular problem-solving approaches with transparent reasoning traces. By breaking down complex problems into manageable subproblems and applying appropriate tools, the system can solve a wide range of reasoning problems effectively.
+The Agentic Reasoning System demonstrates the power of combining modular problem-solving approaches with transparent reasoning traces. By breaking down complex problems into manageable subproblems and applying appropriate tools, the system can solve a wide range of reasoning problems effectively...
