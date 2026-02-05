@@ -119,6 +119,7 @@ agent.process_dataset("test.csv", "output.csv")
 ├── mechanism_solver.py    # Specialized mechanism solver
 ├── requirements.txt      # Project dependencies
 └── README.md            # Documentation
+```
 
 ## Performance
 
